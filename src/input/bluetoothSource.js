@@ -97,6 +97,7 @@ export function createBluetoothSource({
         if (e.sensorOk !== frame.valid) { e.sensorOk = frame.valid; changed(); }
         if (frame.valid) receive({ t: 'm', hand, ts: frame.ts, a: frame.a, ag: frame.ag }, clock());
         if (frame.tap) receive({ t: 'tap', hand, ts: frame.ts }, clock());
+        if (frame.smallTap) receive({ t: 'small', hand, ts: frame.ts }, clock());
       };
       e.stream.addEventListener('characteristicvaluechanged', e.listener);
       receive({ t: 'hello', role: 'phone', hand }, clock());

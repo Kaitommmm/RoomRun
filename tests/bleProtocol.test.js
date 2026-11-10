@@ -49,3 +49,11 @@ test('duplicate/old sequence frames are ignored and both counters can wrap', () 
   expect(decode(packet({ seq: 1, ts: 24 })).ts).toBe(0x100000018);
 });
 
+
+test('small button gives its own one-shot edge, never on a press held while connecting', () => {
+  const decode = createBleDecoder();
+  expect(decode(packet({ seq: 1, buttons: 2 })).smallTap).toBe(false);
+  expect(decode(packet({ seq: 2, buttons: 0 })).smallTap).toBe(false);
+  expect(decode(packet({ seq: 3, buttons: 2 }))).toMatchObject({ smallTap: true, tap: false });
+  expect(decode(packet({ seq: 4, buttons: 2 })).smallTap).toBe(false);
+});

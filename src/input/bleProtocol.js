@@ -35,7 +35,7 @@ export function decodeBleFrame(value) {
 }
 
 export function createBleDecoder() {
-  let lastSeq = null, lastRaw = null, timestamp = 0, mainDown = null;
+  let lastSeq = null, lastRaw = null, timestamp = 0, mainDown = null, smallDown = null;
   return value => {
     const frame = decodeBleFrame(value);
     if (!frame) return null;
@@ -49,9 +49,11 @@ export function createBleDecoder() {
     // Holding the button while connecting must not create an unintended lane change.
     const tap = mainDown === false && frame.mainDown;
     mainDown = frame.mainDown;
+    const smallTap = smallDown === false && frame.smallDown;
+    smallDown = frame.smallDown;
     lastSeq = frame.seq;
     lastRaw = frame.ts;
-    return { ...frame, ts: timestamp, tap };
+    return { ...frame, ts: timestamp, tap, smallTap };
   };
 }
 

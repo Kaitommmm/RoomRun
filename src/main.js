@@ -27,6 +27,7 @@ import { meterFill } from './hud/format.js';
 import { createAudio, soundsForEvent } from './audio/audio.js';
 import { hotkeyAction } from './debug/hotkeys.js';
 import { createDebugPanel } from './debug/panel.js';
+import { gameFlow, audioLevels, watchSticks } from './gameFlow.js';
 
 const preferences = createSettingsStore();
 applyMotionSettings(config, preferences.get());
@@ -64,8 +65,10 @@ const phone = createPhoneSource({ url: bluetoothOnly ? undefined : wsUrl(locatio
 hub.add(phone);
 let bluetoothPanel = null;
 let gameSettings = null;
+/** @type {'start'|null} small button press, used by the next sim step */
+let pendingAction = null;
 const bluetooth = createBluetoothSource({
-  receive: (message, time) => phone.handleMessage(message, time),
+  receive: (message, time) => { if (message.t === 'small') pendingAction = 'start'; else phone.handleMessage(message, time); },
   onChange: (state) => bluetoothPanel?.update(state),
 });
 const haptics = createGameHaptics((pattern) => {
@@ -85,18 +88,31 @@ const world = createWorld(config);
 /** Player state before the latest step, for smooth rendering between steps. */
 const prev = { distance: 0, x: 0, y: 0 };
 const interp = { z: 0, x: 0, y: 0 };
-const extra = { phoneLost: false, tunnelUrl: /** @type {string|null} */ (null), pace: null };
+const extra = { phoneLost: false, tunnelUrl: /** @type {string|null} */ (null), pace: null,
+  /** Bluetooth sticks connected now */ sticksIn: 0,
+  /** hands whose stick dropped mid-run (game paused), or null */ reconnecting: /** @type {string[]|null} */ (null) };
+/** Sticks the current run depends on; see watchSticks. */
+let stickWatch = { expected: new Set(), lost: /** @type {string[]} */ ([]) };
+let lastRetry = 0;
+function restart() { startRun(world); prev.distance = 0; emit(['run-start']); }
+/** A dropped stick usually comes back by itself: retry the known device, no picker needed. */
+function retryLost(now) {
+  if (now - lastRetry < 2000) return;
+  lastRetry = now;
+  const snap = bluetooth.snapshot();
+  for (const hand of stickWatch.lost) if (!snap[hand].connecting) void bluetooth.reconnect(hand);
+}
 bluetoothPanel = createBluetoothPanel(bluetooth, { onSettings() { gameSettings.open(); }, onViewChange(mode) { hud.setDeviceView(mode); }, onSoundTest() {
   return audio.unlock().then(ready => { if (ready) audio.play('coin'); return ready; });
 }, onRestart() {
   void audio.unlock();
-  startRun(world); prev.distance = 0; emit(['run-start']);
+  restart();
 } });
 if (location.protocol === 'https:') bluetoothPanel.setMobileUrl(new URL('./', location.href).href);
 bluetoothPanel.setRunMode(preferences.get().runMode);
 gameSettings = createSettingsPanel({ store: preferences, motion,
   onOpen() { bluetooth.sendHaptic('stop'); phone.sendHaptic('stop'); audio.setDanger(0); },
-  onClose() { phone.reset(); keyboard.reset(); },
+  onClose() { phone.reset(); keyboard.reset(); pendingAction = null; },
 });
 preferences.subscribe((next, previous) => {
   applyMotionSettings(config, next);
@@ -125,7 +141,20 @@ function emit(events) {
 function step(dt) {
   const p = world.player;
   prev.distance = p.distance; prev.x = p.x; prev.y = p.y;
-  const input = hub.read(performance.now());
+  const now = performance.now();
+  stickWatch = watchSticks(stickWatch.expected, bluetooth.snapshot(), world.phase);
+  const flow = gameFlow({ phase: world.phase, action: pendingAction, sticksLost: stickWatch.lost.length > 0 });
+  pendingAction = null;
+  if (flow.start) restart();
+  if (flow.paused) {
+    if (!extra.reconnecting) { bluetooth.sendHaptic('stop'); phone.sendHaptic('stop'); }
+    extra.reconnecting = stickWatch.lost;
+    retryLost(now);
+    hub.read(now); // drain: a jump/lane queued while the stick dropped must not fire on resume
+    return;
+  }
+  extra.reconnecting = null;
+  const input = hub.read(now);
   actors.onSteps(input.steps);
   rig.onSteps(input.steps);
   for (let i = 0; i < Math.min(input.steps, 2); i++) audio.play('step');
@@ -151,10 +180,13 @@ function render(alpha) {
   effects.update(world, renderDt, interp);
   extra.phoneLost = phone.everConnected && !phone.connected(performance.now());
   extra.pace = phone.everConnected && config.motion.runMode === 'exercise' ? motion.exerciseStatus(performance.now()) : null;
+  const snap = bluetooth.snapshot();
+  extra.sticksIn = (snap.L.connected ? 1 : 0) + (snap.R.connected ? 1 : 0);
   hud.update(world, extra);
   const running = world.phase === 'running';
-  audio.setDanger(running ? meterFill(world.chaser.gap, config.chaser) : 0);
-  audio.setChase(running && world.chase.phase === 'active');
+  const levels = audioLevels({ running, paused: !!extra.reconnecting, fill: meterFill(world.chaser.gap, config.chaser), chaseActive: world.chase.phase === 'active' });
+  audio.setDanger(levels.danger);
+  audio.setChase(levels.chase);
   view.render();
 }
 
@@ -168,9 +200,11 @@ window.addEventListener('keydown', (e) => {
   if (gameSettings.isOpen) return;
   if (e.repeat || /** @type {any} */ (e.target)?.tagName === 'INPUT') return; // typing in the panel
   const action = hotkeyAction(e.code);
-  if (action === 'restart') { startRun(world); prev.distance = 0; emit(['run-start']); }
+  // keyboard = operator: play on even with a dead stick
+  if (action === 'restart') { stickWatch = { expected: new Set(), lost: [] }; restart(); }
   else if (action === 'chase') triggerChase(world); // no-op unless a run is going
   else if (action === 'panel') panel.toggle();
+  else if (action === 'hud') hudRoot.hidden = !hudRoot.hidden; // clean shots for video
 });
 
 // Tunnel URL for the title-screen QR. Only exists while `npm run phone` runs;

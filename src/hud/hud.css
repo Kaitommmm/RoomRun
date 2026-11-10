@@ -145,3 +145,10 @@
 :root[data-device-view=mobile] #hud .coins { top: max(12px, env(safe-area-inset-top)); font-size: clamp(20px, 4.5vw, 32px); }
 :root[data-device-view=mobile] #hud .distance { left: max(12px, env(safe-area-inset-left)); }
 :root[data-device-view=mobile] #hud .coins { right: max(12px, env(safe-area-inset-right)); }
+
+/* Bluetooth sticks: how-to on the title (readable from ~2 m), restart hint, drop overlay */
+#hud .title-screen .howto { list-style: none; margin: calc(var(--u) * 2) 0 0; padding: 0; font-size: calc(var(--u) * 3);
+  display: grid; grid-template-columns: auto auto; gap: calc(var(--u) * 0.6) calc(var(--u) * 4); }
+#hud .caught-screen .again-stick { font-size: calc(var(--u) * 3.6); color: #ffec4a; animation: breathe 1.2s ease-in-out infinite alternate; }
+#hud .reconnect { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); }
+#hud .reconnect .txt { font-size: calc(var(--u) * 6); color: #ffec4a; animation: breathe 1.2s ease-in-out infinite alternate; text-align: center; }

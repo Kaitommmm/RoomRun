@@ -10,6 +10,12 @@ export default {
   caught: 'หมาทันแล้ว!',
   restart: 'กด R เพื่อเล่นอีกครั้ง',
   phoneLost: 'มือถือหลุด',
+  // Bluetooth sticks: how-to on the title, restart hint, drop overlay
+  sticks: {
+    again: 'กดปุ่มเล็ก เพื่อเล่นอีกรอบ',
+    reconnecting: (hands) => `จอย${hands.length > 1 ? 'ทั้งสองข้าง' : hands[0] === 'L' ? 'ซ้าย' : 'ขวา'}หลุด กำลังต่อใหม่…`,
+  },
+  howTo: ['วิ่งอยู่กับที่ = วิ่ง', 'ยกจอยสองข้างขึ้นพร้อมกัน = กระโดด', 'ปุ่มใหญ่ = เปลี่ยนเลน', 'กดปุ่มเล็ก = เริ่มเกม'],
   scanToConnect: 'สแกนด้วยมือถือเพื่อใช้เป็นคอนโทรลเลอร์',
   // phone controller page
   phone: {
