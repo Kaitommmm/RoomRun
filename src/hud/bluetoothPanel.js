@@ -108,6 +108,7 @@ export function createBluetoothPanel(controller, { onRestart = () => {}, onViewC
     }
   };
   document.body.append(panel);
+  let lastCount = 0;
   function update(state = controller.snapshot()) {
     let count = 0;
     for (const hand of ['L', 'R']) {
@@ -143,6 +144,9 @@ export function createBluetoothPanel(controller, { onRestart = () => {}, onViewC
       }
     }
     panel.querySelector('[data-count]').textContent = count + ' / 2';
+    // both sticks in: fold the panel so the title how-to is readable; its header reopens it
+    if (count === 2 && lastCount < 2) panel.open = false;
+    lastCount = count;
   }
   update();
   return {

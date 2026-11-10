@@ -30,16 +30,19 @@ export function createHud(root, cfg = config) {
     </div>
     <div class="txt phone-lost hidden"></div>
     <div class="pace-readout hidden" aria-label="จังหวะจอยและความเร็วเกม"></div>
+    <div class="reconnect hidden"><div class="txt"></div></div>
     <div class="screen title-screen">
       <div class="gate-sign"><span class="name"></span></div>
       <div class="txt prompt"></div>
       <div class="txt alt hidden"></div>
+      <ul class="howto hidden"></ul>
       <div class="qr hidden"><canvas></canvas><span class="txt"></span></div>
     </div>
     <div class="screen caught-screen hidden">
       <div class="txt big"></div>
       <div class="stats"><div class="txt d"></div><div class="txt c"></div></div>
       <div class="txt again"></div>
+      <div class="txt again-stick hidden"></div>
     </div>`;
   const $ = (sel) => /** @type {HTMLElement} */ (root.querySelector(sel));
   const el = {
@@ -47,6 +50,8 @@ export function createHud(root, cfg = config) {
     meter: $('.meter'), fill: $('.meter .fill'), face: $('.meter .face'), faceIcon: $('.meter .dog-face'), gap: $('.gap'), heel: $('.heel-icons'),
     banner: $('.banner'), count: $('.count'), phoneLost: $('.phone-lost'), pace: $('.pace-readout'),
     title: $('.title-screen'), alt: $('.title-screen .alt'), qr: $('.qr'), qrCanvas: /** @type {HTMLCanvasElement} */ ($('.qr canvas')),
+    prompt: $('.title-screen .prompt'), howto: $('.howto'), again: $('.caught-screen .again'), againStick: $('.again-stick'),
+    reconnect: $('.reconnect'), reconnectText: $('.reconnect .txt'),
     caught: $('.caught-screen'), caughtD: $('.caught-screen .d'), caughtC: $('.caught-screen .c'),
   };
   $('.title-screen .name').textContent = cfg.title;
@@ -56,6 +61,8 @@ export function createHud(root, cfg = config) {
   $('.caught-screen .big').textContent = strings.caught;
   $('.caught-screen .again').textContent = strings.restart;
   el.phoneLost.textContent = strings.phoneLost;
+  el.againStick.textContent = strings.sticks.again;
+  for (const line of strings.howTo) { const li = document.createElement('li'); li.className = 'txt'; li.textContent = line; el.howto.append(li); }
 
   // write to the DOM only when a value changes
   const last = new Map(); // `${slot}` or node -> last written value, per kind of write
@@ -79,13 +86,21 @@ export function createHud(root, cfg = config) {
       $('.caught-screen .again').textContent = mode === 'mobile'
         ? 'เปิดแผงจอย แล้วแตะเริ่มเกมใหม่' : strings.restart;
     },
-    /** @param {any} world @param {{ phoneLost: boolean, tunnelUrl: string|null, pace?: {stepsPerMinute:number}|null }} extra */
+    /** @param {any} world @param {{ phoneLost: boolean, tunnelUrl: string|null, pace?: {stepsPerMinute:number}|null, sticksIn?: number, reconnecting?: string[]|null }} extra */
     update(world, extra) {
       const running = world.phase === 'running';
       show(el.title, world.phase === 'title');
       show(el.play, world.phase !== 'title');
       show(el.caught, world.phase === 'caught');
-      show(el.phoneLost, !!extra.phoneLost);
+      show(el.phoneLost, !!extra.phoneLost && !extra.reconnecting);
+      show(el.reconnect, running && !!extra.reconnecting);
+      if (extra.reconnecting) text(el.reconnectText, strings.sticks.reconnecting(extra.reconnecting));
+      // a stick is in: the keyboard prompt is noise, the how-to says it all
+      const sticks = (extra.sticksIn ?? 0) > 0;
+      show(el.howto, sticks);
+      show(el.prompt, !sticks);
+      show(el.againStick, sticks);
+      show(el.again, !sticks);
       show(el.pace, running && !!extra.pace);
       if (extra.pace) text(el.pace, `จังหวะจอย ${extra.pace.stepsPerMinute} ครั้ง/นาที · ความเร็วเกม ${Math.round(world.player.speedMps / cfg.player.maxSpeed * 100)}%`);
 

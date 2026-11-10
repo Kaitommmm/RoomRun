@@ -245,3 +245,24 @@ test('optional battery subscription failure leaves motion/haptics connected', as
   s.source.dispose();
 });
 
+
+test('small button press is sent as its own message, separate from lane taps', async () => {
+  const s = setup();
+  await s.source.connect('L');
+  s.devices[0].stream.notify(packet(1));
+  s.devices[0].stream.notify(packet(2, 2));
+  s.devices[0].stream.notify(packet(3, 2));
+  expect(s.received.filter(x => x.message.t === 'small').map(x => x.message.hand)).toEqual(['L']);
+  expect(s.received.filter(x => x.message.t === 'tap')).toHaveLength(0);
+  s.source.dispose();
+});
+
+test('a stick that drops can be reconnected without opening the device picker again', async () => {
+  const s = setup();
+  await s.source.connect('L');
+  s.devices[0].gatt.disconnect();
+  expect(s.source.snapshot().L.connected).toBe(false);
+  expect(await s.source.reconnect('L')).toBe(true);
+  expect(s.choices).toHaveLength(1);
+  s.source.dispose();
+});

@@ -21,10 +21,12 @@ One controller can test running and its assigned lane button. Motion jumping req
 | Run | Jog in place; detected cadence sets game speed | Alternate A / D |
 | Change lane | Main button: L moves left, R moves right | Left / Right arrow |
 | Jump | Clear upward movement of both controllers together | Space |
-| Restart | Start/restart button in the game panel | R |
+| Start / restart | Small button on either controller (title and caught screens only), or the button in the game panel | R |
 | Test vibration | Test button in a connected controller's panel | — |
 
-Developer keys: **C** triggers a dog-pack chase; **backquote** opens the developer tuning panel.
+Developer keys: **C** triggers a dog-pack chase; **backquote** opens the developer tuning panel; **H** hides the HUD for clean video shots.
+
+If a connected controller drops mid-run, the game pauses with a reconnect notice and retries that controller every 2 s; it resumes by itself once the controller is back. **R** on the keyboard restarts without it.
 
 ## Settings and feedback
 

@@ -37,7 +37,14 @@ Licence: CC0 (as listed on the OpenGameArt page).
 | music_chase.ogg | 8_bit/Hallow Quest.ogg |
 
 ## Synthesised in code (`src/audio/synth.js`)
-Tuk-tuk horn and vendor yell (no files yet: drop `horn.ogg` / `yell.ogg` in `public/audio/` to replace them), and fallback sounds for every file, including the growl and pack loops.
+Vendor yell (no file yet: drop `yell.ogg` in `public/audio/` to replace it), and fallback sounds for every file, including the growl and pack loops.
+
+## Horn: supplied by Pong (2026-10-28)
+Converted from mp3 to ogg (silence trimmed, loudness normalised); `horn.mp3` re-encoded from that ogg. Source and licence of the horn clip not checked yet.
+
+| File in `public/audio/` | Original file |
+|---|---|
+| horn.ogg, horn.mp3 | Motorcycle Horn Sound Effect.mp3 |
 
 ## Mobile-compatible audio copies
 
