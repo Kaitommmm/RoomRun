@@ -1,0 +1,23 @@
+{
+  "name": "soip",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "phone": "node server/start.mjs"
+  },
+  "dependencies": {
+    "@fontsource/kanit": "5.3.0",
+    "lil-gui": "0.21.0",
+    "qrcode": "1.5.4",
+    "three": "0.186.1",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

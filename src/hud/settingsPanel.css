@@ -1,0 +1,29 @@
+#roomrun-settings {
+  width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+  box-sizing: border-box; padding: 20px; border: 1px solid #79629d; border-radius: 18px;
+  background: #171223; color: #f6f4ff; font: 14px/1.55 Kanit, sans-serif; overflow: auto; overscroll-behavior: contain;
+}
+#roomrun-settings::backdrop { background: #08050ccc; }
+#roomrun-settings header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+#roomrun-settings header small { color: #bba0e9; letter-spacing: .15em; }
+#roomrun-settings h2 { margin: 0; font-size: 25px; }
+#roomrun-settings .rr-settings-intro { color: #ccc1dd; font-size: 12px; margin: 12px 0 18px; }
+#roomrun-settings fieldset { margin: 14px 0; padding: 12px 14px; border: 1px solid #493959; border-radius: 12px; min-width: 0; }
+#roomrun-settings legend { padding: 0 8px; color: #dcc9ff; font-weight: 600; }
+#roomrun-settings label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0 4px; }
+#roomrun-settings output { color: #c9a6ff; font-size: 12px; white-space: nowrap; }
+#roomrun-settings input[type=range] { width: 100%; min-height: 40px; accent-color: #b995f6; }
+#roomrun-settings input[type=checkbox] { width: 22px; height: 22px; accent-color: #a87fe5; }
+#roomrun-settings .rr-setting-check { justify-content: flex-start; min-height: 44px; }
+#roomrun-settings select { display: block; width: 100%; min-height: 44px; box-sizing: border-box; border: 1px solid #76608f; border-radius: 8px; padding: 8px; background: #292035; color: #fff; font: inherit; }
+#roomrun-settings .rr-setting-tip { margin: 5px 0 10px; color: #c4b9d3; font-size: 12px; }
+#roomrun-settings .rr-motion-meter { display: grid; grid-template-columns: 58px minmax(0,1fr) 95px; gap: 8px; align-items: center; margin: 8px 0; font-size: 12px; }
+#roomrun-settings meter { width: 100%; accent-color: #96e0bb; }
+#roomrun-settings .rr-motion-meter small { grid-column: 2 / -1; color: #a9e2c3; font-size: 11px; }
+#roomrun-settings [data-tune] { width: 100%; background: #493063; }
+#roomrun-settings button:disabled { opacity: .5; cursor: default; }
+#roomrun-settings footer { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 6px; }
+#roomrun-settings footer small { width: 100%; color: #beb0d1; font-size: 11px; }
+#roomrun-settings button { min-height: 44px; padding: 8px 14px; border: 1px solid #79629d; border-radius: 9px; background: #362747; color: #fff; font: inherit; cursor: pointer; touch-action: manipulation; }
+#roomrun-settings [data-done] { background: #7650bd; }
+#roomrun-settings :focus-visible { outline: 2px solid #ddc8ff; outline-offset: 3px; }

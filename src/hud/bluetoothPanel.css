@@ -1,0 +1,75 @@
+#roomrun-bluetooth {
+  box-sizing: border-box;
+  position: fixed; z-index: 30; left: max(12px, env(safe-area-inset-left)); bottom: max(12px, env(safe-area-inset-bottom));
+  width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto;
+  color: #f6f4ff; background: rgba(19,16,31,.96); border: 1px solid #5b4c83; border-radius: 16px;
+  font: 14px/1.45 Kanit, sans-serif; box-shadow: 0 12px 40px #0008;
+}
+#roomrun-bluetooth summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; list-style: none; font-weight: 600; }
+#roomrun-bluetooth summary::-webkit-details-marker { display: none; }
+#roomrun-bluetooth summary b { background: #35284d; color: #a9f1d1; border-radius: 20px; font: 12px/1.5 Kanit,sans-serif; padding: 3px 10px; }
+#roomrun-bluetooth .rr-bt-body { padding: 0 14px 14px; }
+#roomrun-bluetooth p { margin: 0 0 10px; }
+#roomrun-bluetooth small { color: #bfb6d1; font-size: 12px; }
+#roomrun-bluetooth .rr-bt-slot { border: 1px solid #453956; border-radius: 12px; padding: 11px; margin: 10px 0; }
+#roomrun-bluetooth .rr-bt-slot[data-connected=true] { border-color: #52b98c; }
+#roomrun-bluetooth .rr-bt-slot-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+#roomrun-bluetooth [data-status] { color: #bfb6d1; font-size: 11px; text-align: right; }
+#roomrun-bluetooth .rr-bt-slot[data-connected=true] [data-status] { color: #8ce7b8; }
+#roomrun-bluetooth .rr-bt-buttons, #roomrun-bluetooth .rr-bt-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+#roomrun-bluetooth button { border: 1px solid #685190; border-radius: 9px; padding: 7px 10px; background: #392951; color: #fff; font: inherit; font-size: 12px; cursor: pointer; min-height: 36px; }
+#roomrun-bluetooth button:hover { background: #503669; }
+#roomrun-bluetooth button:focus-visible, #roomrun-bluetooth summary:focus-visible { outline: 2px solid #bca3ff; outline-offset: 2px; }
+#roomrun-bluetooth button:disabled { opacity: .5; cursor: wait; }
+#roomrun-bluetooth [data-connect] { background: #7650bd; }
+#roomrun-bluetooth [data-error] { color: #ffb3ad; font-size: 12px; margin: 6px 0 0; overflow-wrap: anywhere; }
+#roomrun-bluetooth .rr-bt-help { color: #ffdf9d; font-size: 12px; }
+#roomrun-bluetooth .rr-bluefy { color: #c6aaff; font-size: 12px; }
+#roomrun-bluetooth .rr-bt-mobile { border-top: 1px solid #443752; margin-top: 12px; padding-top: 12px; font-size: 12px; color: #c9bfd9; }
+#roomrun-bluetooth [data-mobile-help] { font-size: 11px; margin: 5px 0; overflow-wrap: anywhere; }
+#roomrun-bluetooth [hidden] { display: none !important; }
+#roomrun-bluetooth [data-battery] { font-size: 12px; margin: 7px 0 0; color: #c9bfd9; }
+#roomrun-bluetooth [data-battery][data-level=high] { color: #8ce7b8; }
+#roomrun-bluetooth [data-battery][data-level=medium] { color: #ffe08a; }
+#roomrun-bluetooth [data-battery][data-level=low] { color: #ff9a91; }
+#roomrun-bluetooth .rr-bt-battery-help { font-size: 11px; margin: 6px 0; color: #bfb6d1; }
+#roomrun-bluetooth [data-phase] { display: block; margin-top: 5px; }
+#roomrun-bluetooth [data-diagnostic] { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 monospace; background: #08060f; padding: 8px; border-radius: 7px; color: #ffe0be; margin: 6px 0 0; user-select: text; }
+@media (max-height: 540px) { #roomrun-bluetooth[open] { max-height: calc(100dvh - 16px); bottom: 8px; } }
+
+#roomrun-bluetooth button { min-height: 44px; touch-action: manipulation; }
+#roomrun-bluetooth .rr-view-picker { display: flex; gap: 6px; padding: 3px; border: 1px solid #453956; border-radius: 12px; }
+#roomrun-bluetooth .rr-view-picker button { flex: 1; padding: 6px; background: transparent; border-color: transparent; }
+#roomrun-bluetooth .rr-view-picker [aria-pressed=true] { background: #7650bd; border-color: #bca3ff; }
+#roomrun-bluetooth .rr-view-label { display: block; margin: 7px 0; color: #d8c7fa; }
+#roomrun-bluetooth .rr-device-guide { font-size: 12px; color: #d8d1e4; }
+#roomrun-bluetooth .rr-rotate-hint { display: none; font-size: 12px; color: #ffe08a; }
+#roomrun-bluetooth [data-start] { background: #7650bd; font-weight: 600; }
+#roomrun-bluetooth .rr-settings-open { width: 100%; background: #493063; margin: 5px 0 10px; }
+#roomrun-bluetooth .rr-bt-mode { color: #a9e2c3; font-size: 12px; }
+#roomrun-bluetooth .rr-audio-controls { border: 1px solid #453956; border-radius: 10px; padding: 9px; margin: 10px 0; }
+#roomrun-bluetooth [data-sound] { width: 100%; }
+#roomrun-bluetooth [data-sound-status] { margin: 7px 0 0; font-size: 11px; color: #c9bfd9; }
+
+:root[data-device-view=mobile] #roomrun-bluetooth {
+  width: min(440px, calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right))));
+  max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom)));
+  max-height: min(65dvh, calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))));
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+:root[data-device-view=mobile] #roomrun-bluetooth .rr-bt-actions { position: sticky; bottom: 0; padding: 10px 0; background: #13101f; z-index: 1; }
+:root[data-device-view=mobile] #roomrun-bluetooth .rr-bt-actions button { flex: 1; }
+:root[data-device-view=mobile] #roomrun-bluetooth .rr-bt-buttons button { min-width: 84px; }
+:root[data-device-view=mobile] #roomrun-bluetooth:not([open]) { width: min(280px, calc(100vw - 24px)); }
+@media (orientation: portrait) {
+  :root[data-device-view=mobile] #roomrun-bluetooth .rr-rotate-hint { display: block; }
+}
+@media (orientation: landscape) {
+  :root[data-device-view=mobile] #roomrun-bluetooth {
+    left: auto; right: max(8px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom));
+    width: min(340px, calc(100vw - 24px));
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+  }
+}
+

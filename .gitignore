@@ -1,0 +1,6 @@
+node_modules/
+dist/
+logs/
+.superpowers/
+__pycache__/
+.openai/.local/
