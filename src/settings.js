@@ -1,7 +1,7 @@
-export const SETTINGS_KEY = 'roomrun.settings.v2';
+export const SETTINGS_KEY = 'roomrun.settings.v4';
 export const LEGACY_SETTINGS_KEY = 'roomrun.settings.v1';
 export const DEFAULT_SETTINGS = Object.freeze({
-  runMode: 'exercise', sensitivity: 100, exerciseSensitivity: 100, music: 75, effects: 100,
+  runMode: 'exercise', runSpeedMode:'progressive', jumpInput:'flick', sensitivity: 100, exerciseSensitivity: 100, music: 75, effects: 100,
   vibration: true, graphics: 'standard',
 });
 
@@ -11,6 +11,8 @@ export function normalizeSettings(value = {}) {
     ? Math.min(max, Math.max(min, Math.round(value[key]))) : DEFAULT_SETTINGS[key];
   return {
     runMode: ['exercise', 'allAxes', 'vertical'].includes(value.runMode) ? value.runMode : 'exercise',
+    runSpeedMode: value.runSpeedMode === 'effort' ? 'effort' : 'progressive',
+    jumpInput: value.jumpInput === 'button' ? 'button' : 'flick',
     exerciseSensitivity: number('exerciseSensitivity', 60, 120),
     sensitivity: number('sensitivity', 50, 250), music: number('music', 0, 100), effects: number('effects', 0, 100),
     vibration: typeof value.vibration === 'boolean' ? value.vibration : true,
@@ -20,6 +22,8 @@ export function normalizeSettings(value = {}) {
 
 export function applyMotionSettings(config, settings) {
   config.motion.runMode = settings.runMode;
+  config.motion.runSpeedMode = settings.runSpeedMode ?? 'progressive';
+  config.motion.jumpInput = settings.jumpInput ?? 'flick';
   const gain = settings.sensitivity / 100;
   config.motion.swingThreshold = 2.2 / gain;
   config.motion.bounceStepThreshold = 8 / gain;
@@ -49,8 +53,12 @@ export function createSettingsStore(storage) {
     const current = storage?.getItem(SETTINGS_KEY);
     if (current) values = normalizeSettings(JSON.parse(current));
     else {
-      const legacy = JSON.parse(storage?.getItem(LEGACY_SETTINGS_KEY) || 'null');
-      values = normalizeSettings({ ...legacy, runMode:'exercise', exerciseSensitivity:100 });
+      // Migrate the previous exercise release and keep its other preferences.
+      // Keep audio, display and sensitivity preferences; later explicit changes
+      // are saved in v4 and respected on subsequent launches.
+      const previous = storage?.getItem('roomrun.settings.v3') || storage?.getItem('roomrun.settings.v2');
+      const legacy = JSON.parse(previous || storage?.getItem(LEGACY_SETTINGS_KEY) || 'null');
+      values = normalizeSettings({ ...legacy, runMode:'exercise', exerciseSensitivity:previous ? legacy?.exerciseSensitivity : 100 });
     }
   } catch { /* defaults */ }
   const listeners = new Set();

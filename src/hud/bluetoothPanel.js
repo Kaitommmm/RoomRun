@@ -1,12 +1,13 @@
 import './bluetoothPanel.css';
+import { controlScheme } from '../controlScheme.js';
 import { createDeviceView } from './deviceView.js';
 
-export function createBluetoothPanel(controller, { onRestart = () => {}, onViewChange = () => {}, onSoundTest = () => Promise.resolve(false), onSettings = () => {} } = {}) {
+export function createBluetoothPanel(controller, { onRestart = () => {}, onViewChange = () => {}, onGoToGame = () => {}, onSettings = () => {} } = {}) {
   const panel = document.createElement('details');
   panel.id = 'roomrun-bluetooth';
   panel.open = true;
   panel.innerHTML = `
-    <summary><span>RoomRun Bluetooth</span><b data-count>0 / 2</b></summary>
+    <summary><span>RoomRun Bluetooth</span><b data-count>0 / 2</b><button type="button" data-go-game>ไปหน้าเกม</button></summary>
     <div class="rr-bt-body">
       <div class="rr-view-picker" role="group" aria-label="มุมมองการเล่น">
         <button type="button" data-view="desktop" aria-pressed="false">คอม</button>
@@ -18,7 +19,6 @@ export function createBluetoothPanel(controller, { onRestart = () => {}, onViewC
       <p class="rr-bt-mode" data-run-mode></p>
       <p class="rr-device-guide" data-device-guide></p>
       <p class="rr-rotate-hint">วางมือถือแนวนอนเพื่อเห็นสนามได้กว้างขึ้น</p>
-      <div class="rr-audio-controls"><button type="button" data-sound>เปิด / ทดสอบเสียง</button><p data-sound-status role="status">ถ้าเงียบ ให้ปิดโหมดเงียบของ iPhone และเพิ่มระดับเสียงสื่อ</p></div>
       <p class="rr-bt-intro">เปิดจอย แล้วเลือกด้านที่ต้องการเชื่อม<br><small>ไม่ต้องตั้ง Wi-Fi หรือ IP</small></p>
       <div data-slots></div>
       <small>RoomRun Battery 1 · Bluetooth diagnostics 2</small>
@@ -29,24 +29,14 @@ export function createBluetoothPanel(controller, { onRestart = () => {}, onViewC
       <div class="rr-bt-mobile"><span>เล่นบน iPhone ผ่าน Bluefy</span><p data-mobile-help>iPhone ต้องเปิดลิงก์เกมแบบ HTTPS ใน Bluefy</p><button type="button" data-copy hidden>คัดลอกลิงก์เกม</button></div>
     </div>`;
   const slots = {};
+  const buttonGuide = document.createElement('p');
+  buttonGuide.className = 'rr-bt-help';
+  buttonGuide.textContent = 'ปุ่มเล็ก L: หยุดชั่วคราว · ปุ่มเล็ก R: เริ่ม / เล่นต่อ';
+  panel.querySelector('.rr-bt-body').prepend(buttonGuide);
   panel.querySelector('[data-settings]').onclick = onSettings;
-  let soundTimer;
-  panel.querySelector('[data-sound]').onclick = () => {
-    const button = panel.querySelector('[data-sound]');
-    const status = panel.querySelector('[data-sound-status]');
-    button.disabled = true;
-    status.textContent = 'กำลังเปิดเสียง…';
-    // Invoke synchronously within the click; waiting first loses user activation.
-    let result;
-    try { result = onSoundTest(); } catch { result = false; }
-    const timeout = new Promise(resolve => { soundTimer = setTimeout(() => resolve(false), 3000); });
-    Promise.race([Promise.resolve(result).catch(() => false), timeout]).then(ready => {
-      clearTimeout(soundTimer);
-      if (!panel.isConnected) return;
-      button.disabled = false;
-      status.textContent = ready ? 'ส่งเสียงทดสอบแล้ว · ถ้าไม่ได้ยิน ให้ปิดโหมดเงียบและตรวจระดับเสียง / หูฟัง'
-        : 'ยังเปิดเสียงไม่ได้ ลองแตะอีกครั้ง และตรวจโหมดเงียบ / ระดับเสียง';
-    });
+  panel.querySelector('[data-go-game]').onclick = event => {
+    event.preventDefault(); event.stopPropagation();
+    panel.open=false; onGoToGame();
   };
   const deviceView = createDeviceView((mode, preference) => {
     document.documentElement.dataset.deviceView = mode;
@@ -108,6 +98,7 @@ export function createBluetoothPanel(controller, { onRestart = () => {}, onViewC
     }
   };
   document.body.append(panel);
+  let lastCount = 0;
   function update(state = controller.snapshot()) {
     let count = 0;
     for (const hand of ['L', 'R']) {
@@ -143,13 +134,16 @@ export function createBluetoothPanel(controller, { onRestart = () => {}, onViewC
       }
     }
     panel.querySelector('[data-count]').textContent = count + ' / 2';
+    // both sticks in: fold the panel so the title how-to is readable; its header reopens it
+    if (count === 2 && lastCount < 2) panel.open = false;
+    lastCount = count;
   }
   update();
   return {
     update,
-    setRunMode(mode) {
-      panel.querySelector('[data-run-mode]').textContent = mode === 'exercise' ? 'ออกกำลังกาย · ทุกทิศทาง'
-        : mode === 'allAxes' ? 'เล่นเบา / ทดสอบ · ทุกทิศทาง' : 'ขึ้นลงตามแรงโน้มถ่วง · แบบเดิม';
+    setRunMode(mode, settings = {}) {
+      const help=controlScheme(settings);
+      panel.querySelector('[data-run-mode]').textContent = `วิ่ง: ${help.runLabel} · กระโดด: ${help.jumpLabel}`;
     },
     setMobileUrl(url) {
       try {
@@ -161,7 +155,7 @@ export function createBluetoothPanel(controller, { onRestart = () => {}, onViewC
         panel.querySelector('[data-copy]').hidden = false;
       } catch { /* no public game link yet */ }
     },
-    dispose() { clearTimeout(soundTimer); deviceView.dispose(); panel.remove(); },
+    dispose() { deviceView.dispose(); panel.remove(); },
   };
 }
 

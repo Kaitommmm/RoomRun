@@ -12,6 +12,14 @@ test('upgrading old light-play settings selects exercise without losing audio pr
   const result = createSettingsStore(storage).get();
   expect(result).toMatchObject({runMode:'exercise', exerciseSensitivity:100, sensitivity:240,music:0,effects:40,vibration:false});
 });
+test('the effort release migrates v2 light play once while preserving sound and sensitivity',()=>{
+  const data=new Map([['roomrun.settings.v2',JSON.stringify({runMode:'allAxes',music:20,effects:45,vibration:false,exerciseSensitivity:110})]]);
+  const storage={getItem:key=>data.get(key),setItem:(key,value)=>data.set(key,value)};
+  const store=createSettingsStore(storage);
+  expect(store.get()).toMatchObject({runMode:'exercise',music:20,effects:45,vibration:false,exerciseSensitivity:110});
+  store.set({runMode:'allAxes'});
+  expect(createSettingsStore(storage).get().runMode).toBe('allAxes');
+});
 
 test('exercise sensitivity is independent and cannot weaken the minimum effort indefinitely', () => {
   const config = {motion:{}};

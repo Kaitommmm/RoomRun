@@ -1,6 +1,8 @@
 import { test, expect } from 'vitest';
 import { createMotionDetector } from '../src/input/motion.js';
-import config from '../src/config.js';
+import currentConfig from '../src/config.js';
+// Isolated legacy gate/cadence regressions; default effort/lift integration: effortLift.test.js.
+const config={...currentConfig,motion:{...currentConfig.motion,jumpMode:'paired',runSpeedMode:'cadence',exerciseEffort:{enabled:false}}};
 
 function rotate([x,y,z]) {
   const a=0.8,b=1.1;
@@ -69,7 +71,7 @@ test('exercise stops and requires a new rhythm after a pause',()=>{
 
 test('linear acceleration alone supports exercise, and maximum sensitivity still rejects light waving',()=>{
   expect(drive({fn:t=>[0,0,3*Math.sin(t/1000*2*Math.PI*2.4)],threshold:4.4/1.2}).steps).toBe(0);
-  const detector=createMotionDetector();
+  const detector=createMotionDetector(config.motion);
   for(let t=0;t<3000;t+=20) { detector.push({hand:'L',ts:t,a:jog(t)}); detector.read(t); }
   expect(detector.read(3000).speed).toBeGreaterThan(0.5);
 });
@@ -81,7 +83,7 @@ test('exercise accepts all three axes, either starting direction and diagonal mo
   }
   for(const result of results) {
     expect(result.steps).toBeGreaterThanOrEqual(8);
-    expect(result.frames.at(-1).speed).toBeCloseTo(2/3.2,1);
+    expect(result.frames.at(-1).speed).toBeCloseTo(.91,1);
     expect(result.steps).toBe(results[0].steps);
   }
 });
@@ -101,9 +103,10 @@ test('moderate exercise bounce starts more easily while retaining the rhythm req
 });
 
 test('character speed follows detected cadence across slow, medium and fast jogging',()=>{
-  const rates=[1.5,2,2.5,3.2];
+  const rates=[1,1.4,1.8,2.5];
   const speeds=rates.map(hz=>drive({fn:t=>[0,0,7*Math.sin(t/1000*2*Math.PI*hz)],duration:6000}).frames.at(-1).speed);
-  rates.forEach((hz,i)=>expect(speeds[i]).toBeCloseTo(Math.min(1,hz/3.2),1));
+  const expected=[.45,.64,.82,1];
+  expected.forEach((value,i)=>expect(speeds[i]).toBeCloseTo(value,1));
   for(let i=1;i<speeds.length;i++) expect(speeds[i]-speeds[i-1]).toBeGreaterThan(0.1);
 });
 
@@ -121,7 +124,8 @@ test('changing running pace does not reset a rhythm that was already acquired',(
   const result=drive({fn,duration:9000});
   expect(result.frames.filter(x=>x.t>2500).every(x=>x.speed>0.1)).toBe(true);
   expect(result.frames.find(x=>x.t===5800).speed).toBeGreaterThan(result.frames.find(x=>x.t===2800).speed+0.25);
-  expect(result.frames.at(-1).speed).toBeLessThan(0.6);
+  expect(result.frames.at(-1).speed).toBeLessThan(.8);
+  expect(result.frames.at(-1).speed).toBeLessThan(result.frames.find(x=>x.t===5800).speed-.15);
 });
 
 test('one missed jogging pulse slows the character instead of stopping the run outright',()=>{

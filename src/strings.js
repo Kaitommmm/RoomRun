@@ -9,7 +9,25 @@ export default {
   survived: 'รอดแล้ว!',
   caught: 'หมาทันแล้ว!',
   restart: 'กด R เพื่อเล่นอีกครั้ง',
-  phoneLost: 'มือถือหลุด',
+  nearMiss: 'เฉียด!',
+  combo: (m) => `x${m}`,
+  comboLost: 'คอมโบหลุด',
+  board: {
+    title: 'อันดับสูงสุด',
+    score: (n) => `คะแนน ${n}`,             // n already formatted
+    pickHead: 'ติดอันดับ! เลือกตัวละคร',
+    pickHint: 'เลือกสัตว์ · ปุ่มหลัก = เปลี่ยน · ปุ่มเล็กขวา = ยืนยัน',
+    // caught screen: the board entry just above this run (n already formatted)
+    soClose: (n, icon, name, close) => n === '0' ? `เสมอ ${icon} ${name}! อีกแค่ 1 คะแนน`
+      : `${close ? 'อีกนิดเดียว! ' : ''}${icon} ${name}นำอยู่ ${n} คะแนน!`,
+  },
+  phoneLost: 'จอยหลุด',
+  // Bluetooth sticks: how-to on the title, restart hint, drop overlay
+  sticks: {
+    again: 'กดปุ่มเล็กฝั่งขวาเพื่อเริ่มใหม่',
+    reconnecting: (hands) => `จอย${hands.length > 1 ? 'ทั้งสองข้าง' : hands[0] === 'L' ? 'ซ้าย' : 'ขวา'}หลุด กำลังต่อใหม่…`,
+  },
+  howTo: ['แกว่งแขนสลับเป็นจังหวะ = วิ่ง', 'วิ่งต่อเนื่อง = ค่อย ๆ เร่งจนเร็วสุด · หยุดขยับ = ชะลอ', 'สะบัดจอยสองข้างขึ้นพร้อมกันสั้น ๆ = กระโดด', 'ปุ่มใหญ่ซ้าย/ขวา = เปลี่ยนเลน', 'ปุ่มเล็กซ้าย = พัก · ขวา = เริ่ม / วิ่งต่อ'],
   scanToConnect: 'สแกนด้วยมือถือเพื่อใช้เป็นคอนโทรลเลอร์',
   // phone controller page
   phone: {

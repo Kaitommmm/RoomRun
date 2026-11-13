@@ -4,13 +4,15 @@
 export function createSwingSignal({ positiveOnly = false, cyclePeaks = false } = {}) {
   let center = null, filtered = [0, 0, 0], previousTime = null;
   let valley = 0, peak = 0, tracking = false, activeSamples = 0;
-  let level = 0, peakHold = 0;
+  let level = 0, peakHold = 0, acceptedPeak = 0, acceptedPeriod = null;
   let settleUntil = 0;
   let peakQuality = 1;
   let peakVector = [0,0,0], cycleDirection = null, cycleTime = -Infinity;
   return {
     get level() { return level; },
     get peak() { return peakHold; },
+    get acceptedPeak() { return acceptedPeak; },
+    get acceptedPeriod() { return acceptedPeriod; },
     push(a, time, threshold, enabled = true, quality = 1) {
       if (!center || previousTime == null || time - previousTime > 250 || time <= previousTime) {
         // Gravity-relative linear acceleration should be centred on zero. Do
@@ -18,7 +20,8 @@ export function createSwingSignal({ positiveOnly = false, cyclePeaks = false } =
         center = positiveOnly || cyclePeaks ? [0,0,0] : [...a]; filtered = [0, 0, 0]; previousTime = time;
         cycleDirection = null; cycleTime = -Infinity;
         settleUntil = time + 120;
-        valley = peak = level = peakHold = 0; tracking = false; activeSamples = 0;
+        valley = peak = level = peakHold = acceptedPeak = 0; tracking = false; activeSamples = 0;
+        acceptedPeriod = null;
         return false;
       }
       const dt = Math.min(0.1, (time - previousTime) / 1000);
@@ -59,8 +62,13 @@ export function createSwingSignal({ positiveOnly = false, cyclePeaks = false } =
         const opposite = cycleDirection && time - cycleTime <= 1100
           && direction.reduce((sum,x,i) => sum + x * cycleDirection[i], 0) < -0.25;
         if (opposite) counted = false;
-        else { cycleDirection = direction; cycleTime = time; }
+        else {
+          const period = time - cycleTime;
+          acceptedPeriod = period > 0 && period <= 1100 ? period : null;
+          cycleDirection = direction; cycleTime = time;
+        }
       }
+      if (counted) acceptedPeak = peak;
       tracking = false; valley = level; peak = level; activeSamples = 0;
       return counted;
     },

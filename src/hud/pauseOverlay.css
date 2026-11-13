@@ -1,0 +1,12 @@
+#roomrun-pause { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:24px; background:#080b1899; color:#fff; text-align:center; font-family:Kanit,sans-serif; pointer-events:none; }
+#roomrun-pause[hidden], #roomrun-pause [hidden] { display:none; }
+#roomrun-pause > div { max-width:420px; padding:24px 32px; border:1px solid #ffffff44; border-radius:20px; background:#161323ed; box-shadow:0 16px 64px #0006; pointer-events:auto; }
+#roomrun-pause h2 { font-size:clamp(26px,5vw,38px); margin:0 0 8px; }
+#roomrun-pause p { margin:0 0 16px; color:#ded6ef; }
+#roomrun-pause button { cursor:pointer; border:0; border-radius:10px; padding:10px 28px; background:#bde7d4; color:#142c22; font:600 16px Kanit,sans-serif; }
+#roomrun-pause button:focus-visible { outline:3px solid white; outline-offset:4px; }
+.rr-pause-actions { display:flex; flex-direction:column; gap:10px; }
+#roomrun-pause [data-restart] { background:#372437; color:#ffd3c9; border:1px solid #b77c81; }
+#roomrun-pause small { display:block; color:#bfb1c7; font-size:12px; line-height:1.6; margin-top:12px; }
+#roomrun-pause > div { box-sizing:border-box; max-height:calc(100dvh - 48px); overflow-y:auto; }
+#roomrun-pause [data-menu] { background:#292a46; color:#e2e4ff; border:1px solid #707399; }

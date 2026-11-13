@@ -1,6 +1,13 @@
 node_modules/
 dist/
 logs/
-.superpowers/
 __pycache__/
-.openai/.local/
+.openai/
+.codex/
+.agents/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store

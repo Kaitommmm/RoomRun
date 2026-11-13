@@ -1,6 +1,8 @@
 import { test, expect, vi } from 'vitest';
 import { createBluetoothSource } from '../src/input/bluetoothSource.js';
 import { BLE_SERVICE, BLE_MOTION, BLE_CONTROL, BLE_BATTERY } from '../src/input/bleProtocol.js';
+import { createRunControls } from '../src/input/runControls.js';
+import { mainButtonAction } from '../src/input/controllerActions.js';
 
 function packet(seq, buttons = 0, valid = true) {
   const d = new DataView(new ArrayBuffer(20));
@@ -39,7 +41,7 @@ class Device extends EventTarget {
     };
   }
 }
-function setup(devices = [new Device('left'), new Device('right')]) {
+function setup(devices = [new Device('left'), new Device('right')], extra = {}) {
   const received = [], choices = [], memory = new Map();
   let next = 0, now = 100;
   const bluetooth = {
@@ -49,7 +51,7 @@ function setup(devices = [new Device('left'), new Device('right')]) {
   };
   const storage = { getItem: key => memory.get(key), setItem: (key, value) => memory.set(key, value) };
   const source = createBluetoothSource({ bluetooth, secure: true, storage,
-    receive: (message, time) => received.push({ message, time }), clock: () => now });
+    receive: (message, time) => received.push({ message, time }), clock: () => now, ...extra });
   return { source, devices, received, choices, memory, storage, bluetooth, setTime: value => { now = value; } };
 }
 
@@ -81,6 +83,44 @@ test('same device cannot occupy both hands and a bad sensor never sends stale mo
   expect(s.received.filter(x => x.message.t === 'm')).toHaveLength(0);
   expect(s.received.filter(x => x.message.t === 'tap')).toHaveLength(1);
   expect(s.source.snapshot().L.sensorOk).toBe(false);
+  s.source.dispose();
+});
+
+test('small button frames use the selected L/R slot to pause and start exactly once per press', async () => {
+  let phase='title'; const actions=[];
+  const controls = createRunControls({ getPhase:()=>phase,
+    onStart:()=>{phase='running';actions.push('start');},
+    onPause:()=>actions.push('pause'), onResume:()=>actions.push('resume') });
+  const s = setup([new Device('one'),new Device('two')],{onSmallPress:hand=>controls.press(hand)});
+  await s.source.connect('L'); await s.source.connect('R');
+  const [left,right]=s.devices;
+  left.stream.notify(packet(1)); right.stream.notify(packet(1));
+  right.stream.notify(packet(2,2,false)); right.stream.notify(packet(3,2,false));
+  left.stream.notify(packet(2,2)); left.stream.notify(packet(3,2));
+  right.stream.notify(packet(4,0)); right.stream.notify(packet(5,2));
+  expect(actions).toEqual(['start','pause','resume']);
+  s.source.dispose();
+});
+
+test('a paused right main-button BLE edge restarts once and does not queue a lane on the new run', async () => {
+  let starts = 0; const lanes = [];
+  const controls = createRunControls({ getPhase: () => 'running', onStart() { starts++; }, onPause() {}, onResume() {} });
+  const s = setup([new Device('left'), new Device('right')], {
+    onSmallPress: hand => controls.press(hand),
+    receive(message) {
+      if (message.t !== 'tap') return;
+      const action = mainButtonAction({ hand: message.hand, paused: controls.paused, phase: 'running' });
+      if (action === 'restart') controls.restart(); else if (action === 'lane') lanes.push(message.hand);
+    },
+  });
+  await s.source.connect('L'); await s.source.connect('R');
+  const [left, right] = s.devices;
+  left.stream.notify(packet(1)); right.stream.notify(packet(1));
+  left.stream.notify(packet(2, 2)); expect(controls.paused).toBe(true);
+  right.stream.notify(packet(2, 1)); right.stream.notify(packet(3, 1)); right.stream.notify(packet(4, 1));
+  expect(starts).toBe(1); expect(controls.paused).toBe(false); expect(lanes).toEqual([]);
+  right.stream.notify(packet(5)); right.stream.notify(packet(6, 1));
+  expect(starts).toBe(1); expect(lanes).toEqual(['R']);
   s.source.dispose();
 });
 
@@ -245,3 +285,24 @@ test('optional battery subscription failure leaves motion/haptics connected', as
   s.source.dispose();
 });
 
+
+test('small button press is sent as its own message, separate from lane taps', async () => {
+  const s = setup();
+  await s.source.connect('L');
+  s.devices[0].stream.notify(packet(1));
+  s.devices[0].stream.notify(packet(2, 2));
+  s.devices[0].stream.notify(packet(3, 2));
+  expect(s.received.filter(x => x.message.t === 'small').map(x => x.message.hand)).toEqual(['L']);
+  expect(s.received.filter(x => x.message.t === 'tap')).toHaveLength(0);
+  s.source.dispose();
+});
+
+test('a stick that drops can be reconnected without opening the device picker again', async () => {
+  const s = setup();
+  await s.source.connect('L');
+  s.devices[0].gatt.disconnect();
+  expect(s.source.snapshot().L.connected).toBe(false);
+  expect(await s.source.reconnect('L')).toBe(true);
+  expect(s.choices).toHaveLength(1);
+  s.source.dispose();
+});

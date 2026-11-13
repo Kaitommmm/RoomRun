@@ -21,7 +21,7 @@ test('chaseSeconds rounds up so the countdown ends on 1, never shows 0 while act
 
 test('strings', () => {
   expect(strings.gap(24)).toBe('หมาห่าง 24 ม.');
-  expect(strings.phoneLost).toBe('มือถือหลุด');
+  expect(strings.phoneLost).toBe('จอยหลุด');
 });
 
 test('dog-theme strings', () => {

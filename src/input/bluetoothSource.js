@@ -2,7 +2,7 @@ import { BLE_SERVICE, BLE_MOTION, BLE_CONTROL, BLE_BATTERY, HAPTIC_COMMAND, crea
 
 const PRIORITY = { test: 0, hit: 1, pack: 2, caught: 3, stop: 100 };
 export function createBluetoothSource({
-  receive, onChange = () => {}, bluetooth = globalThis.navigator?.bluetooth,
+  receive, onChange = () => {}, onSmallPress = () => {}, bluetooth = globalThis.navigator?.bluetooth,
   secure = globalThis.isSecureContext !== false,
   storage, clock = () => performance.now(),
 }) {
@@ -94,9 +94,11 @@ export function createBluetoothSource({
         if (!current()) return;
         const frame = decode(event.target?.value);
         if (!frame) return;
+        if (frame.smallTap) onSmallPress(hand);
         if (e.sensorOk !== frame.valid) { e.sensorOk = frame.valid; changed(); }
         if (frame.valid) receive({ t: 'm', hand, ts: frame.ts, a: frame.a, ag: frame.ag }, clock());
         if (frame.tap) receive({ t: 'tap', hand, ts: frame.ts }, clock());
+        if (frame.smallTap) receive({ t: 'small', hand, ts: frame.ts }, clock());
       };
       e.stream.addEventListener('characteristicvaluechanged', e.listener);
       receive({ t: 'hello', role: 'phone', hand }, clock());

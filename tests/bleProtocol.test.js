@@ -49,3 +49,18 @@ test('duplicate/old sequence frames are ignored and both counters can wrap', () 
   expect(decode(packet({ seq: 1, ts: 24 })).ts).toBe(0x100000018);
 });
 
+test('small button emits one edge per press, including with invalid IMU, and ignores a held button on connect', () => {
+  const decode = createBleDecoder();
+  expect(decode(packet({ seq:1, buttons:2 })).smallTap).toBe(false);
+  expect(decode(packet({ seq:2, buttons:2 })).smallTap).toBe(false);
+  expect(decode(packet({ seq:3, buttons:0 })).smallTap).toBe(false);
+  const press = decode(packet({ seq:4, buttons:3, valid:false }));
+  expect(press.smallTap).toBe(true);
+  expect(press.tap).toBe(true);
+  expect(press.valid).toBe(false);
+  expect(decode(packet({ seq:4, buttons:0 }))).toBe(null);
+  expect(decode(packet({ seq:5, buttons:2 })).smallTap).toBe(false);
+  expect(decode(packet({ seq:6, buttons:0 })).smallTap).toBe(false);
+  expect(decode(packet({ seq:7, buttons:2 })).smallTap).toBe(true);
+});
+

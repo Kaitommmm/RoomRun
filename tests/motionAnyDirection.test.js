@@ -1,6 +1,8 @@
 import { test, expect } from 'vitest';
 import { createMotionDetector } from '../src/input/motion.js';
-import config from '../src/config.js';
+import currentConfig from '../src/config.js';
+// Isolated legacy gate/cadence regressions; default effort/lift integration: effortLift.test.js.
+const config={...currentConfig,motion:{...currentConfig.motion,jumpMode:'paired',runSpeedMode:'cadence',exerciseEffort:{enabled:false}}};
 import { sensitivityFromMotion } from '../src/settings.js';
 
 const identity = v => v;
@@ -90,7 +92,7 @@ test('automatic tuning from the received signal recovers gentle upright movement
 
 test('jump remains gravity-based with a rotated mount in the all-axis running mode', () => {
   const { frames } = simulate({ axis: 2, rotation: rotate, hands: ['L','R'], duration: 1000,
-    value: t => t >= 100 && t < 180 ? 18 : 0 });
+    value: t => t >= 100 && t < 180 ? 18 : t >= 180 && t < 430 ? -9 : 0 });
   expect(frames.filter(x => x.jump)).toHaveLength(1);
 });
 
@@ -104,7 +106,7 @@ test('reset clears pending steps and stale telemetry is hidden', () => {
 });
 
 test('malformed or non-finite samples cannot poison the motion detector', () => {
-  const detector = createMotionDetector();
+  const detector = createMotionDetector(config.motion);
   for (const a of [[NaN,0,0], [Infinity,0,0], [1,2], null]) detector.push({ hand:'L', ts:0, a });
   expect(detector.levels(0).L.magnitude).toBeNull();
   expect(detector.read(0).speed).toBe(0);

@@ -1,6 +1,8 @@
 import { test, expect } from 'vitest';
 import { createMotionDetector as createDetector } from '../src/input/motion.js';
-import config from '../src/config.js';
+import currentConfig from '../src/config.js';
+// Isolated legacy gate/cadence regressions; default effort/lift integration: effortLift.test.js.
+const config={...currentConfig,motion:{...currentConfig.motion,jumpMode:'paired',runSpeedMode:'cadence',exerciseEffort:{enabled:false}}};
 import { createCadence } from '../src/input/cadence.js';
 
 // Preserve coverage for the selectable original vertical/bounce mode.
@@ -66,106 +68,99 @@ test('old steps: slow arm swing gives a slower speed than a fast one', () => {
   expect(slow).toBeLessThan(fast - 0.3);
 });
 
-test('both hands airborne together for 250 ms -> one jump, no lane', () => {
-  const det = createMotionDetector();
-  const air = spike(100, 250, true);
-  const frames = drive(det, 0, 1000, (hand, t) => ({ air: air(t) }));
-  expect(sum(frames, (f) => (f.jump ? 1 : 0))).toBe(1);
-  expect(frames.some((f) => f.laneDelta !== 0)).toBe(false);
+const leap = (t, at = 100, peak = 18) => {
+  const x = t - at;
+  return { v: x >= 0 && x < 80 ? peak : x >= 80 && x < 330 ? -9 : x >= 330 && x < 390 ? 30 : 0,
+    air: x >= 80 && x < 330 };
+};
+
+test('airborne-like readings without a preceding lift never jump', () => {
+  const det = createMotionDetector(config.motion);
+  const frames = drive(det, 0, 1000, (_, t) => ({ v: t >= 100 && t < 350 ? -9 : 0, air: t >= 100 && t < 350 }));
+  expect(frames.some(f => f.jump)).toBe(false);
 });
 
 test('one hand reading airborne alone is not a jump', () => {
-  const det = createMotionDetector();
+  const det = createMotionDetector(config.motion);
   const air = spike(100, 250, true);
   const frames = drive(det, 0, 1000, (hand, t) => ({ air: hand === 'L' && air(t) }));
   expect(frames.some((f) => f.jump)).toBe(false);
 });
 
 test('a dip shorter than freefallMs is not a jump', () => {
-  const det = createMotionDetector();
+  const det = createMotionDetector(config.motion);
   const air = spike(100, 80, true);
   const frames = drive(det, 0, 1000, (hand, t) => ({ air: air(t) }));
   expect(frames.some((f) => f.jump)).toBe(false);
 });
 
-test('jump works whatever way the phone is tilted (no device axis involved)', () => {
-  const det = createMotionDetector();
+test('complete jump sequence works with tilted phones', () => {
+  const det = createMotionDetector(config.motion); const up = [.707, 0, -.707];
   for (let t = 0; t < 1000; t += DT) {
+    const { v } = leap(t);
     for (const hand of ['L', 'R']) {
-      const airborne = t >= 100 && t < 350;
-      det.push({ hand, ts: t, a: [0, 0, 0], ag: airborne ? [0.3, -0.2, 0.4] : [6.9, 0, -6.9] }); // tilted 45 deg
+      const a = up.map(u => u * v);
+      det.push({ hand, ts:t, a, ag:a.map((x,i) => x + up[i] * 9.8) });
     }
     if (det.read(t).jump) return;
   }
-  throw new Error('no jump');
+  throw new Error('No confirmed tilted jump');
 });
 
-test('both hands push up together -> jump fires at the push, not mid-air', () => {
-  const det = createMotionDetector();
-  const push = spike(100, 50, 18);
-  const frames = drive(det, 0, 1000, (hand, t) => ({ v: push(t) }));
-  const jumps = frames.filter((f) => f.jump);
-  expect(jumps.length).toBe(1);
-  expect(jumps[0].t).toBeLessThan(150);
+test('a shared push needs repeated paired samples, without a flight requirement', () => {
+  const frames = drive(createMotionDetector(config.motion), 0, 1000, (_, t) => leap(t));
+  const jumps = frames.filter(f => f.jump);
+  expect(jumps).toHaveLength(1); expect(jumps[0].t).toBeGreaterThanOrEqual(120); expect(jumps[0].t).toBeLessThan(180);
+  expect(jumps[0].t).toBeLessThan(430);
 });
 
-test('landing thump after the push is not a second jump', () => {
-  const det = createMotionDetector();
-  const push = spike(100, 50, 18), land = spike(450, 50, 25);
-  const frames = drive(det, 0, 1200, (hand, t) => ({ v: push(t) + land(t) }));
-  expect(sum(frames, (f) => (f.jump ? 1 : 0))).toBe(1);
+test('landing thump after a confirmed jump is not a second jump', () => {
+  const frames = drive(createMotionDetector(config.motion), 0, 1500, (_, t) => leap(t));
+  expect(frames.filter(f => f.jump)).toHaveLength(1);
 });
 
 test('one hand pushing up alone is not a jump', () => {
-  const det = createMotionDetector();
+  const det = createMotionDetector(config.motion);
   const push = spike(100, 50, 18);
   const frames = drive(det, 0, 1000, (hand, t) => ({ v: hand === 'L' ? push(t) : 0 }));
   expect(frames.some((f) => f.jump)).toBe(false);
 });
 
-test('push-up jump works with the phone tilted (up comes from gravity, not a device axis)', () => {
-  const det = createMotionDetector();
-  const up = [0.707, 0, -0.707]; // phone tilted 45 deg: gravity reads on x and -z
+test('one paired spike at any orientation does not jump', () => {
+  const det = createMotionDetector(config.motion); const up = [.707, 0, -.707];
   for (let t = 0; t < 1000; t += DT) {
-    const p = t >= 100 && t < 150 ? 18 : 0;
-    for (const hand of ['L', 'R']) {
-      const a = up.map((u) => u * p);
-      det.push({ hand, ts: t, a, ag: a.map((x, i) => x + up[i] * 9.8) });
+    const v = t >= 100 && t < 115 ? 30 : 0;
+    for (const hand of ['L','R']) {
+      const a = up.map(u => u * v); det.push({ hand, ts:t, a, ag:a.map((x,i) => x + up[i] * 9.8) });
     }
-    if (det.read(t).jump) return;
+    expect(det.read(t).jump).toBe(false);
   }
-  throw new Error('no jump');
 });
 
 /** Running bounce: both hands rise and fall together, once per step (~2.7 Hz), peak `amp`. */
 const bounce = (amp, hz = 2.7) => (t) => amp * Math.sin(2 * Math.PI * hz * (t / 1000));
 
 test('running bounce just over jumpThreshold is not a jump (real log 2026-10-28: 15-18 per step)', () => {
-  const det = createMotionDetector();
+  const det = createMotionDetector(config.motion);
   const b = bounce(19);
   // a run starts gently: the bounce grows over the first second
   const frames = drive(det, 0, 5000, (hand, t) => ({ v: b(t) * Math.min(1, t / 1000) }));
   expect(frames.some((f) => f.jump)).toBe(false);
 });
 
-test('a real jump out of a running bounce still fires', () => {
-  const det = createMotionDetector();
-  const b = bounce(17), push = spike(3000, 60, 45);
-  const frames = drive(det, 0, 3500, (hand, t) => ({ v: t < 2900 ? b(t) * Math.min(1, t / 1000) : push(t) }));
-  const jumps = frames.filter((f) => f.jump);
-  expect(jumps.length).toBe(1);
-  expect(jumps[0].t).toBeGreaterThanOrEqual(3000);
+test('complete real jump out of running still fires', () => {
+  const b = bounce(17);
+  const frames = drive(createMotionDetector(config.motion), 0, 3700, (_,t) => t < 2900 ? { v:b(t) * Math.min(1,t/1000) } : leap(t,3000,28));
+  const jumps = frames.filter(f => f.jump); expect(jumps).toHaveLength(1); expect(jumps[0].t).toBeGreaterThanOrEqual(3020);
 });
 
-test('a second jump soon after the first still fires (the first push does not raise the bar much)', () => {
-  const det = createMotionDetector();
-  const a = spike(100, 60, 45), b = spike(1100, 60, 28);
-  const frames = drive(det, 0, 1600, (hand, t) => ({ v: a(t) + b(t) }));
-  expect(sum(frames, (f) => (f.jump ? 1 : 0))).toBe(2);
+test('equal moderate jumps remain detectable after landing and settling', () => {
+  const frames = drive(createMotionDetector(config.motion), 0, 1900, (_,t) => t < 1000 ? leap(t,100,18) : leap(t,1200,18));
+  expect(frames.filter(f => f.jump)).toHaveLength(2);
 });
 
 test('bounce steps: running bounce at 2.7 Hz -> one step per bounce, full speed, no jump', () => {
-  const det = createMotionDetector();
+  const det = createMotionDetector(config.motion);
   const b = bounce(15);
   const frames = drive(det, 0, 3000, (hand, t) => ({ v: b(t) * Math.min(1, t / 1000) }));
   const steps = sum(frames, (f) => f.steps);
@@ -176,7 +171,7 @@ test('bounce steps: running bounce at 2.7 Hz -> one step per bounce, full speed,
 });
 
 test('bounce steps ignore phone tilt and arm twist (only world-up counts)', () => {
-  const det = createMotionDetector();
+  const det = createMotionDetector(config.motion);
   let steps = 0;
   for (let t = 0; t < 3000; t += DT) {
     const u = 15 * Math.sin(2 * Math.PI * 2.7 * (t / 1000));
@@ -194,7 +189,7 @@ test('bounce steps ignore phone tilt and arm twist (only world-up counts)', () =
 });
 
 test('motion lanes are off by default: a two-hand flick does nothing', () => {
-  const det = createMotionDetector();
+  const det = createMotionDetector(config.motion);
   const go = spike(100, 50, -18);
   const frames = drive(det, 0, 1000, (hand, t) => ({ lat: go(t) }));
   expect(frames.some((f) => f.laneDelta !== 0)).toBe(false);

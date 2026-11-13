@@ -5,7 +5,7 @@
 //
 // Hands twist hard while running (up to ~1400 deg/s), so no device axis stays
 // "up" or "sideways" for long. Steps and jumps therefore use orientation-free
-// magnitudes; only the legacy motion lanes still read device axes.
+// magnitudes for steps and gravity projection for jumps; legacy lanes read device axes.
 //
 // Step (exercise, default): require clear linear-acceleration peaks in any direction and
 // three regularly spaced pulses before producing speed. This encourages
@@ -23,25 +23,30 @@
 //   (front and back), so each hand counts every stepEvery-th peak: one step per
 //   cycle per hand, like the legs. stepSign != 0 instead keeps only the peaks
 //   where the vertical axis has that sign (old, tilt-sensitive).
-// Jump: both hands push up past their bar within jumpWindowMs (the takeoff,
-//   so it fires early). "Up" is the gravity direction, ag - a, so wrist tilt
-//   does not matter. Running bounces the body (both hands together) once per
-//   step, so the bar is jumpOverBounce x the recent bounce peak, never under
-//   jumpThreshold. The landing thump falls in jumpCooldownMs. Backup: both
-//   hands in free fall (|ag| under freefallThreshold) together for freefallMs.
+// Jump: selected deliberate lift command (default), or paired-lift legacy gate.
+// Default exercise speed ramps with continued running presence and brakes on silence.
+// Older effort/cadence stages remain selectable for regression/comparison.
+// Legacy gate: repeated, overlapping upward support from both hands. The shared
+//   running envelope raises the bar; individual arm swings do not. No mandatory
+//   freefall or stable-hand phase: hands can stay supported and keep running.
 // Lane (motionLanes only): both hands' lateral axis past swipeThreshold, same
 //   sign, within swipeWindowMs. Off by default: lanes come from phone taps.
 import config from '../config.js';
 import { createCadence } from './cadence.js';
 import { createSwingSignal } from './swingSignal.js';
+import { createJumpGate } from './jumpGate.js';
+import { createLiftGesture } from './liftGesture.js';
+import { createEffortPace } from './effortPace.js';
+import { createProgressivePace } from './progressivePace.js';
+import { createFlickGesture } from './flickGesture.js';
 
 /**
  * @param {typeof config.motion} cfg read live on every sample
  * @param {ReturnType<typeof createCadence>} cadence shared by both hands
  */
 export function createMotionDetector(cfg = config.motion, cadence = createCadence(cfg.cadence)) {
-  const exerciseCadence = createCadence(cfg.exerciseCadence ?? { ...cfg.cadence, minRate:0, fullRate:3.2, followPace:true });
-  const hand = () => ({ mag: 0, lat: 0, up: 0, upPeak: 0, bounce: 0, jumpBar: cfg.jumpThreshold, lastStep: -Infinity, peaks: 0, latSpike: null, upSpike: null, fallSince: null,
+  const exerciseCadence = createCadence(cfg.exerciseCadence ?? { ...cfg.cadence, minRate:0, fullRate:2.2, followPace:true });
+  const hand = () => ({ mag: 0, lat: 0, up: 0, upPeak: 0, lastStep: -Infinity, peaks: 0, latSpike: null,
     swing: createSwingSignal(), exercise: createSwingSignal({ cyclePeaks:true }), history: [], stepCount: 0, seen: -Infinity });
   const hands = { L: hand(), R: hand() };
   let gestureFreeAt = -Infinity;
@@ -52,6 +57,12 @@ export function createMotionDetector(cfg = config.motion, cadence = createCadenc
   /** @type {-1|0|1} */
   let laneDelta = 0;
   let jump = false;
+  let jumpsEnabled = true;
+  let lastRunPulse = -Infinity;
+  const progressive = createProgressivePace(cfg.progressivePace);
+  const jumpGate = cfg.jumpMode === 'flick' ? createFlickGesture(cfg) : cfg.jumpMode === 'lift' ? createLiftGesture(cfg) : createJumpGate(cfg);
+  const effortPace = createEffortPace(cfg.exerciseEffort);
+  const useEffort = () => cfg.exerciseEffort?.enabled !== false;
 
   const crossed = (prev, now, threshold) => Math.abs(prev) < threshold && Math.abs(now) >= threshold;
   const pairs = (a, b, t, windowMs) => a && b && a.sign === b.sign && Math.abs(a.t - b.t) <= windowMs && t - a.t <= windowMs;
@@ -61,8 +72,10 @@ export function createMotionDetector(cfg = config.motion, cadence = createCadenc
     stepsFreeAt = t + cfg.suppressStepsAfterGestureMs;
     cadence.holdFor(cfg.gestureHoldMs, t);
     exerciseCadence.holdFor(cfg.gestureHoldMs, t);
+    effortPace.holdFor(cfg.gestureHoldMs, t);
+    progressive.holdFor(cfg.gestureHoldMs, t);
     exerciseHoldUntil = t + cfg.gestureHoldMs;
-    for (const h of Object.values(hands)) { h.latSpike = null; h.upSpike = null; h.fallSince = null; }
+    for (const h of Object.values(hands)) { h.latSpike = null; }
   }
 
   return {
@@ -84,19 +97,10 @@ export function createMotionDetector(cfg = config.motion, cadence = createCadenc
       const gn = g ? Math.hypot(...g) : 0;
       const up = gn > 3 ? (a[0] * g[0] + a[1] * g[1] + a[2] * g[2]) / gn : 0;
       h.upPeak = Math.max(up, h.upPeak * 0.98); // debug readout: recent biggest push
-      // each rise is judged against the bounce envelope from before it started, so a jump can't raise its own bar
-      if (h.up <= 0 && up > 0) h.jumpBar = Math.max(cfg.jumpThreshold, cfg.jumpOverBounce * h.bounce);
-
-      if (ag != null) h.fallSince = ag < cfg.freefallThreshold ? (h.fallSince ?? t) : null;
-      if (t < gestureFreeAt) {
-        h.bounce *= cfg.bounceDecay; // landing thumps (in the cooldown) stay out
-      } else {
-        // capped, so a jump's own push can't lift the bar for the next jump
-        h.bounce = Math.max(Math.min(up, cfg.bounceCap), h.bounce * cfg.bounceDecay);
+      const confirmedJump = jumpGate.push({ hand: sample.hand, t, up, load: ag, gravity: gn }, jumpsEnabled && cfg.jumpInput !== 'button');
+      if (t >= gestureFreeAt) {
         if (cfg.motionLanes && crossed(h.lat, lat, cfg.swipeThreshold)) h.latSpike = { t, sign: Math.sign(lat) };
-        if (h.up < h.jumpBar && up >= h.jumpBar) h.upSpike = { t, sign: 1 };
-        if (pairs(h.upSpike, other.upSpike, t, cfg.jumpWindowMs)
-            || (h.fallSince != null && other.fallSince != null && t - Math.max(h.fallSince, other.fallSince) >= cfg.freefallMs)) {
+        if (confirmedJump) {
           jump = true;
           gesture(t, cfg.jumpCooldownMs);
         } else if (cfg.motionLanes && pairs(h.latSpike, other.latSpike, t, cfg.swipeWindowMs)) {
@@ -105,17 +109,22 @@ export function createMotionDetector(cfg = config.motion, cadence = createCadenc
         }
       }
 
-      const swingPeak = h.swing.push(a, t, cfg.swingThreshold ?? 2.2, cfg.runMode === 'allAxes' && t >= stepsFreeAt);
+      // The paired flick's up/brake peaks are a command, not evidence of running.
+      // One alternating arm stroke alone does not interrupt presence detection.
+      const acceptSteps = t >= stepsFreeAt && !jumpGate.busy;
+      const swingPeak = h.swing.push(a, t, cfg.runMode === 'exercise' ? cfg.exerciseThreshold ?? 4.4 : cfg.swingThreshold ?? 2.2, ['exercise','allAxes'].includes(cfg.runMode) && acceptSteps);
       const exercisePeak = h.exercise.push(a, t, cfg.exerciseThreshold ?? 4.4,
-        cfg.runMode === 'exercise' && t >= stepsFreeAt);
+        cfg.runMode === 'exercise' && acceptSteps);
       h.history.push({ ts: t, level: h.swing.level, exercise:h.exercise.level });
       if (h.history.length > 200) h.history.shift();
       if (cfg.runMode === 'exercise') {
-        if (exercisePeak && t - lastExerciseStep >= (cfg.exerciseMinGapMs ?? 240)) {
+        if (swingPeak || exercisePeak) lastRunPulse = t;
+        if (exercisePeak && t - lastExerciseStep >= (cfg.exerciseMinGapMs ?? 180)) {
           if (t - lastExerciseStep > (cfg.exerciseMaxGapMs ?? 1100)) {
             exerciseBeats = []; exerciseReady = false; exerciseCadence.reset();
           }
           lastExerciseStep = t; h.stepCount++;
+          effortPace.addPeak(h.exercise.acceptedPeak, t, h.exercise.acceptedPeriod ? 1000 / h.exercise.acceptedPeriod : 0);
           exerciseBeats.push(t); if (exerciseBeats.length > 3) exerciseBeats.shift();
           if (exerciseReady) exerciseCadence.addStep(t);
           else if (exerciseBeats.length === 3) {
@@ -146,6 +155,11 @@ export function createMotionDetector(cfg = config.motion, cadence = createCadenc
       h.mag = mag; h.lat = lat; h.up = up;
     },
 
+    requestJump(now) {
+      if (cfg.jumpInput !== 'button' || !jumpsEnabled || !Number.isFinite(now) || now < gestureFreeAt) return false;
+      jump = true; gesture(now, cfg.jumpCooldownMs); return true;
+    },
+    setJumpEnabled(enabled) { jumpsEnabled = !!enabled; if (!jumpsEnabled) jump = false; },
     /** Debug readout: each hand's recent biggest upward push, m/s^2. */
     upPeaks() { return { L: hands.L.upPeak, R: hands.R.upPeak }; },
     levels(nowMs) {
@@ -156,14 +170,17 @@ export function createMotionDetector(cfg = config.motion, cadence = createCadenc
     exerciseStatus(now) {
       const fresh = now - lastExerciseStep <= (cfg.exerciseMaxGapMs ?? 1100);
       return { ready: fresh && exerciseReady, beats: fresh ? exerciseBeats.length : 0,
+        runningNow: fresh && exerciseReady && now - lastRunPulse <= (cfg.runPresenceMs ?? 650),
+        progressive: cfg.runSpeedMode === 'progressive',
+        effortPercent: fresh && exerciseReady ? Math.round(effortPace.effort * 100) : 0,
         stepsPerMinute: fresh && exerciseReady ? Math.round(exerciseCadence.rate(now) * 60) : 0 };
     },
     samplesSince(time) { return Object.values(hands).flatMap(h => h.history.filter(s => s.ts >= time).map(s => cfg.runMode === 'exercise' ? s.exercise : s.level)); },
     reset() {
       hands.L = hand(); hands.R = hand();
       gestureFreeAt = stepsFreeAt = lastBounceStep = lastSwingStep = -Infinity;
-      laneDelta = 0; jump = false; cadence.reset();
-      lastExerciseStep = exerciseHoldUntil = -Infinity; exerciseBeats = []; exerciseReady = false; exerciseCadence.reset();
+      laneDelta = 0; jump = false; cadence.reset(); jumpGate.reset();
+      lastExerciseStep = exerciseHoldUntil = -Infinity; exerciseBeats = []; exerciseReady = false; exerciseCadence.reset(); effortPace.reset(); progressive.reset(); lastRunPulse = -Infinity;
     },
 
     /** @returns {import('./hub.js').InputFrame} lane and jump fire once */
@@ -172,7 +189,13 @@ export function createMotionDetector(cfg = config.motion, cadence = createCadenc
         exerciseBeats = []; exerciseReady = false;
       }
       const source = cfg.runMode === 'exercise' ? exerciseCadence : cadence;
-      const frame = { speed: source.speed(nowMs), laneDelta, jump, steps: source.takeSteps() };
+      const cadenceSpeed = source.speed(nowMs);
+      const running = exerciseReady && nowMs - lastRunPulse <= (cfg.runPresenceMs ?? 650);
+      const speed = cfg.runMode === 'exercise' && cfg.runSpeedMode === 'progressive'
+        ? progressive.speed(running, nowMs)
+        : cfg.runMode === 'exercise' && useEffort()
+          ? effortPace.speed(cadenceSpeed, exerciseCadence.rate(nowMs), nowMs) : cadenceSpeed;
+      const frame = { speed, laneDelta, jump, steps: source.takeSteps() };
       laneDelta = 0;
       jump = false;
       return frame;

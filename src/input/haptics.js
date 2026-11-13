@@ -1,4 +1,7 @@
 // Game events -> short, named feedback. No queued feedback after a disconnect.
+// `send` names the stick's motor code (defaults to the pattern name).
+// Near-miss has no buzz: the firmware has no own code for it, and borrowing the
+// hit pulse made a good dodge feel like a hit [Pong, 2026-11-12]. Text + sound only.
 const FEEDBACK = {
   hit: { duration: 120, priority: 1 },
   pack: { duration: 650, priority: 2 },
@@ -29,7 +32,7 @@ export function createGameHaptics(send, clock = () => performance.now()) {
       const now = clock();
       // Do not restart a pulse every frame; stronger feedback can interrupt it.
       if (now < busyUntil && next.priority <= priority) return false;
-      if (!send(pattern)) return false;
+      if (!send(next.send ?? pattern)) return false;
       busyUntil = now + next.duration;
       priority = next.priority;
       return true;
